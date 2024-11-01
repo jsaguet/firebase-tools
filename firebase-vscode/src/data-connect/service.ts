@@ -1,10 +1,8 @@
-import fetch, { Response } from "node-fetch";
 import {
   ExecutionResult,
   IntrospectionQuery,
   getIntrospectionQuery,
 } from "graphql";
-import { assertExecutionResult } from "../../common/graphql";
 import { DataConnectError } from "../../common/error";
 import { AuthService } from "../auth/service";
 import { UserMockKind } from "../../common/messaging/protocol";
@@ -39,13 +37,12 @@ export class DataConnectService {
     private emulatorsController: EmulatorsController,
   ) {}
 
-  async servicePath(
-    path: string
-  ): Promise<string | undefined> {
+  async servicePath(path: string): Promise<string | undefined> {
     const dataConnectConfigsValue = await firstWhereDefined(dataConnectConfigs);
     // TODO: avoid calling this here and in getApiServicePathByPath
     const serviceId =
-      dataConnectConfigsValue?.tryReadValue?.findEnclosingServiceForPath(path)?.value.serviceId;
+      dataConnectConfigsValue?.tryReadValue?.findEnclosingServiceForPath(path)
+        ?.value.serviceId;
     const projectId = firebaseRC.value?.tryReadValue?.projects?.default;
 
     if (serviceId === undefined || projectId === undefined) {
@@ -189,7 +186,7 @@ export class DataConnectService {
         extensions: {}, // Introspection is the only caller of executeGraphqlRead
       });
       const resp = await fetch(
-        (await this.dataConnectToolkit.getFDCToolkitURL()) +
+        this.dataConnectToolkit.getFDCToolkitURL() +
           `/v1beta/projects/p/locations/l/services/${serviceId}:executeGraphqlRead`,
         {
           method: "POST",
@@ -265,9 +262,9 @@ function parseVariableString(variables: string): Record<string, any> {
   }
   try {
     return JSON.parse(variables);
-  } catch(e: any) {
+  } catch (e: any) {
     throw new Error(
-      "Unable to parse variables as JSON. Double check that that there are no unmatched braces or quotes, or unqouted keys in the variables pane."
+      "Unable to parse variables as JSON. Double check that that there are no unmatched braces or quotes, or unqouted keys in the variables pane.",
     );
   }
 }

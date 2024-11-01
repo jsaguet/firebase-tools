@@ -1,5 +1,4 @@
 import * as clc from "colorette";
-import * as FormData from "form-data";
 import * as http from "http";
 import * as jwt from "jsonwebtoken";
 import * as opn from "open";
@@ -315,7 +314,6 @@ async function getTokensFromAuthorizationCode(
       method: "POST",
       path: "/o/oauth2/token",
       body: form,
-      headers: form.getHeaders(),
       skipLog: { body: true, queryParams: true, resBody: true },
     });
   } catch (err: any) {
@@ -367,13 +365,11 @@ async function getGithubTokensFromAuthorizationCode(code: string, callbackUrl: s
   for (const [k, v] of Object.entries(data)) {
     form.append(k, v);
   }
-  const headers = form.getHeaders();
-  headers.accept = "application/json";
   const res = await client.request<any, GitHubAuthResponse>({
     method: "POST",
     path: "/login/oauth/access_token",
     body: form,
-    headers,
+    headers: { accept: "application/json" },
   });
   return res.body.access_token;
 }
@@ -667,7 +663,6 @@ async function refreshTokens(
       method: "POST",
       path: "/oauth2/v3/token",
       body: form,
-      headers: form.getHeaders(),
       skipLog: { body: true, queryParams: true, resBody: true },
       resolveOnHTTPError: true,
     });

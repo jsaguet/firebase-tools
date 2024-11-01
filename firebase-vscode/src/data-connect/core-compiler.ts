@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
 import { Range, DiagnosticSeverity, Diagnostic, Uri, Position } from "vscode";
-import fetch from "node-fetch";
 import { GraphQLError } from "graphql";
 import { Observable, of } from "rxjs";
 import { backOff } from "exponential-backoff";
@@ -59,10 +58,7 @@ function convertGQLErrorToDiagnostic(
     perFileDiagnostics[absFilePath] = perFileDiagnostic;
   }
   return Object.keys(perFileDiagnostics).map((key) => {
-    return [
-      Uri.file(key),
-      perFileDiagnostics[key],
-    ] as DiagnosticTuple;
+    return [Uri.file(key), perFileDiagnostics[key]] as DiagnosticTuple;
   });
 }
 

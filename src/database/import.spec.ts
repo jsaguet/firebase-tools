@@ -5,7 +5,7 @@ import { expect } from "chai";
 
 import DatabaseImporter from "./import";
 import { FirebaseError } from "../error";
-import { FetchError } from "node-fetch";
+import { errors } from "undici";
 
 const dbUrl = new URL("https://test-db.firebaseio.com/foo");
 const payloadSize = 1024 * 1024 * 10;
@@ -164,8 +164,7 @@ describe("DatabaseImporter", () => {
   });
 
   it("retries non-fatal connection timeout error", async () => {
-    const timeoutErr = new FetchError("connect ETIMEDOUT", "system");
-    timeoutErr.code = "ETIMEDOUT";
+    const timeoutErr = new TypeError("fetch failed", { cause: new errors.ConnectTimeoutError() });
 
     nock("https://test-db.firebaseio.com").get("/foo.json?shallow=true").reply(200);
     nock("https://test-db.firebaseio.com")

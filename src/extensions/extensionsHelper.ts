@@ -3,7 +3,6 @@ import * as ora from "ora";
 import * as semver from "semver";
 import * as tmp from "tmp";
 import * as fs from "fs-extra";
-import fetch from "node-fetch";
 import * as path from "path";
 import { marked } from "marked";
 import { markedTerminal } from "marked-terminal";
@@ -41,6 +40,8 @@ import { getLocalChangelog } from "./change-log";
 import { getProjectNumber } from "../getProjectNumber";
 import { Constants } from "../emulator/constants";
 import { defineSecret } from "firebase-functions/params";
+import { Readable } from "stream";
+import type { ReadableStream } from "node:stream/web";
 
 /**
  * SpecParamType represents the exact strings that the extensions
@@ -761,8 +762,10 @@ async function fetchExtensionSource(
   )}. Please check that the repo is public and that the source ref is valid.`;
   try {
     const response = await fetch(archiveUri);
-    if (response.ok) {
-      await response.body.pipe(createUnzipTransform(tempDirectory.name)).promise();
+    if (response.ok && response.body) {
+      await Readable.fromWeb(response.body as ReadableStream) // TS ReadableStream type is missing AsyncIterator.
+        .pipe(createUnzipTransform(tempDirectory.name))
+        .promise();
     }
   } catch (err) {
     throw new FirebaseError(archiveErrorMessage);

@@ -1,13 +1,14 @@
 import { capitalize, includes } from "lodash";
-import { FetchError, Headers } from "node-fetch";
 import { IncomingMessage, ServerResponse } from "http";
-import { PassThrough } from "stream";
+import { PassThrough, Readable } from "stream";
 import { Request, RequestHandler, Response } from "express";
 import { URL } from "url";
 
-import { Client, HttpMethod } from "../apiv2";
+import { Client, ClientResponse, HttpMethod } from "../apiv2";
 import { FirebaseError } from "../error";
 import { logger } from "../logger";
+import { errors } from "undici";
+import type { ReadableStream } from "node:stream/web";
 
 const REQUIRED_VARY_VALUES = ["Accept-Encoding", "Authorization", "Cookie"];
 
@@ -91,7 +92,7 @@ export function proxyRequestHandler(
       }
     }
 
-    let proxyRes;
+    let proxyRes: ClientResponse<NodeJS.ReadableStream>;
     try {
       proxyRes = await c.request<unknown, NodeJS.ReadableStream>({
         method: (req.method || "GET") as HttpMethod,
@@ -110,13 +111,9 @@ export function proxyRequestHandler(
         err instanceof FirebaseError && err.original?.name.includes("AbortError");
       const isTimeoutError =
         err instanceof FirebaseError &&
-        err.original instanceof FetchError &&
-        err.original.code === "ETIMEDOUT";
-      const isSocketTimeoutError =
-        err instanceof FirebaseError &&
-        err.original instanceof FetchError &&
-        err.original.code === "ESOCKETTIMEDOUT";
-      if (isAbortError || isTimeoutError || isSocketTimeoutError) {
+        err.original instanceof TypeError &&
+        err.original.cause instanceof errors.ConnectTimeoutError;
+      if (isAbortError || isTimeoutError) {
         res.statusCode = 504;
         return res.end("Timed out waiting for function to respond.\n");
       }
@@ -145,36 +142,12 @@ export function proxyRequestHandler(
 
     proxyRes.response.headers.set("vary", makeVary(proxyRes.response.headers.get("vary")));
 
-    // Fix the location header that `node-fetch` attempts to helpfully fix:
-    // https://github.com/node-fetch/node-fetch/blob/4abbfd231f4bce7dbe65e060a6323fc6917fd6d9/src/index.js#L117-L120
-    // Filed a bug in `node-fetch` to either document the change or fix it:
-    // https://github.com/node-fetch/node-fetch/issues/1086
-    const location = proxyRes.response.headers.get("location");
-    if (location) {
-      // If parsing the URL fails, it may be because the location header
-      // isn't a helpeful resolved URL (if node-fetch changes behavior). This
-      // try is a preventative measure to ensure such a change shouldn't break
-      // our emulator.
-      try {
-        const locationURL = new URL(location);
-        // Only assume we can fix the location header if the origin of the
-        // "fixed" header is the same as the origin of the outbound request.
-        if (locationURL.origin === u.origin) {
-          const unborkedLocation = location.replace(locationURL.origin, "");
-          proxyRes.response.headers.set("location", unborkedLocation);
-        }
-      } catch (e: any) {
-        logger.debug(
-          `[hosting] had trouble parsing location header, but this may be okay: "${location}"`,
-        );
-      }
-    }
-
-    for (const [key, value] of Object.entries(proxyRes.response.headers.raw())) {
-      res.setHeader(key, value as string[]);
+    for (const [key, value] of proxyRes.response.headers.entries()) {
+      res.setHeader(key, value);
     }
     res.statusCode = proxyRes.status;
-    proxyRes.response.body.pipe(res);
+    // Casting because TS ReadableStream type is missing AsyncIterator.
+    Readable.fromWeb(proxyRes.response.body! as ReadableStream).pipe(res);
   };
 }
 

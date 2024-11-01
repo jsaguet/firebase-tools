@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import fetch from "node-fetch";
 import { Observable, of } from "rxjs";
 import { backOff } from "exponential-backoff";
 import { ResolvedDataConnectConfigs } from "./config";

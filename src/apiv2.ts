@@ -1,17 +1,13 @@
-import { AbortSignal } from "abort-controller";
 import { URL, URLSearchParams } from "url";
 import { Readable } from "stream";
-import { ProxyAgent } from "proxy-agent";
 import * as retry from "retry";
-import AbortController from "abort-controller";
-import fetch, { HeadersInit, Response, RequestInit, Headers } from "node-fetch";
 import util from "util";
 
 import * as auth from "./auth";
 import { FirebaseError } from "./error";
 import { logger } from "./logger";
 import { responseToError } from "./responseToError";
-import * as FormData from "form-data";
+import { ProxyAgent, setGlobalDispatcher } from "undici";
 
 // Using import would require resolveJsonModule, which seems to break the
 // build/output format.
@@ -354,14 +350,17 @@ export class Client {
     }
 
     const fetchOptions: RequestInit = {
-      headers: options.headers,
+      headers: {
+        ...options.headers,
+        ...(options.compress && { "Accept-Encoding": "gzip, deflate, br" }),
+      },
       method: options.method,
       redirect: options.redirect,
-      compress: options.compress,
     };
 
-    if (proxyURIFromEnv()) {
-      fetchOptions.agent = new ProxyAgent();
+    const proxyURI = proxyURIFromEnv();
+    if (proxyURI) {
+      setGlobalDispatcher(new ProxyAgent({ uri: proxyURI }));
     }
 
     if (options.signal) {
@@ -558,6 +557,6 @@ function bodyToString(body: unknown): string {
   }
 }
 
-function isStream(o: unknown): o is NodeJS.ReadableStream {
+function isStream(o: unknown): o is ReadableStream | FormData {
   return o instanceof Readable || o instanceof FormData;
 }
