@@ -358,10 +358,11 @@ export class Client {
       redirect: options.redirect,
     };
 
-    const proxyURI = proxyURIFromEnv();
-    if (proxyURI) {
-      setGlobalDispatcher(new ProxyAgent({ uri: proxyURI }));
-    }
+    // TODO: use proxy per request instead of global proxy
+    // const proxyURI = proxyURIFromEnv();
+    // if (proxyURI) {
+    //   setGlobalDispatcher(new ProxyAgent({ uri: proxyURI }));
+    // }
 
     if (options.signal) {
       fetchOptions.signal = options.signal;

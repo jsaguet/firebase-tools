@@ -1,24 +1,32 @@
 import { expect } from "chai";
-import * as nock from "nock";
 import { dynamicLinksKey, dynamicLinksOrigin } from "./api";
 import { shortenUrl } from "./shortenUrl";
+import { setGlobalDispatcher, MockAgent } from "undici";
 
 describe("shortenUrl", () => {
   const TEST_LINK = "https://abc.def/";
   const MOCKED_LINK = "https://firebase.tools/l/TEST";
 
+  const agent = new MockAgent();
+  agent.disableNetConnect();
+  setGlobalDispatcher(agent);
+
   function mockDynamicLinks(url: string, suffix = "UNGUESSABLE", code = 200): void {
-    nock(dynamicLinksOrigin())
-      .post(
-        `/v1/shortLinks`,
-        (body: { dynamicLinkInfo?: { link: string }; suffix?: { option: string } }) =>
-          body.dynamicLinkInfo?.link === url && body.suffix?.option === suffix,
-      )
-      .query({ key: dynamicLinksKey() })
-      .reply(code, {
-        shortLink: MOCKED_LINK,
-        previewLink: `${MOCKED_LINK}?d=1`,
-      });
+    agent
+      .get(dynamicLinksOrigin())
+      .intercept({
+        path: `/v1/shortLinks`,
+        method: "POST",
+        body: (body: string) => {
+          const parsed = JSON.parse(body) as {
+            dynamicLinkInfo?: { link: string };
+            suffix?: { option: string };
+          };
+          return parsed.dynamicLinkInfo?.link === url && parsed.suffix?.option === suffix;
+        },
+        query: { key: dynamicLinksKey() },
+      })
+      .reply(code, { shortLink: MOCKED_LINK, previewLink: `${MOCKED_LINK}?d=1` });
   }
 
   it("should return a shortened url with an unguessable suffix by default", async () => {
